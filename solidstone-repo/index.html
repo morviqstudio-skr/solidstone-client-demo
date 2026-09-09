@@ -706,7 +706,7 @@
           <textarea id="f-notes" placeholder="Rough size, timeline, anything else worth knowing"></textarea>
         </div>
         <button type="submit" class="btn btn-primary" style="justify-content:center; margin-top:8px;">Send enquiry</button>
-        <p class="form-note">This preview isn't wired up to send anything yet — see the note below the form.</p>
+        <p class="form-note">Enquiries are emailed directly to Solidstone. For anything urgent, calling is still fastest.</p>
         <div class="form-status" id="formStatus"></div>
       </form>
     </div>
@@ -815,13 +815,52 @@
     }, {passive:true});
   }
 
-  // Enquiry form — preview only, never claims to send
+  // Enquiry form — submits to the Cloudflare Worker relay, which emails Solidstone via Resend
+  var RELAY_URL = "https://wispy-bird-8b93.morviqstudio.workers.dev";
   var form = document.getElementById('enquiryForm');
   var status = document.getElementById('formStatus');
+  var submitBtn = form.querySelector('button[type="submit"]');
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    status.textContent = "This is a design preview — the form isn't connected to send enquiries yet. Please call (905) 391-9778 or email solidstoneinterlocking@gmail.com directly for now.";
+
+    var payload = {
+      name: document.getElementById('f-name').value,
+      phone: document.getElementById('f-phone').value,
+      service: document.getElementById('f-service').value,
+      notes: document.getElementById('f-notes').value
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending…";
+    status.textContent = "Sending your enquiry…";
     status.classList.add('show');
+
+    fetch(RELAY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(function(res){
+        if(!res.ok){ throw new Error("Request failed with status " + res.status); }
+        return res.json();
+      })
+      .then(function(data){
+        if(data && data.ok){
+          status.textContent = "Thanks — your enquiry has been sent. We'll get back to you shortly, or call (905) 391-9778 for a faster response.";
+          form.reset();
+        } else {
+          throw new Error((data && data.error) || "Unknown error");
+        }
+      })
+      .catch(function(err){
+        status.textContent = "Something went wrong sending this automatically. Please call (905) 391-9778 or email solidstoneinterlocking@gmail.com directly instead.";
+        console.error("Enquiry form error:", err);
+      })
+      .finally(function(){
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Send enquiry";
+      });
   });
 })();
 </script>
